@@ -1,0 +1,29 @@
+<%
+puma = node[:app][:puma]
+%>
+rails_env      = "<%= node[:app][:rails_env] %>"
+socket_file    = "<%= puma[:socket] %>"
+pid_file       = "<%= puma[:pid] %>"
+state_file     = "<%= puma[:state] %>"
+log_file       = "<%= puma[:log] %>"
+error_log_file = "<%= puma[:error_log] %>"
+app_path       = "<%= node[:app][:app_path] %>"
+
+environment rails_env
+
+workers Integer(<%= node[:app][:puma][:workers] %>)
+threads_count = Integer(<%= node[:app][:puma][:threads] %>)
+threads threads_count, threads_count
+
+bind  "unix://#{socket_file}"
+pidfile "#{pid_file}"
+state_path "#{state_file}"
+stdout_redirect "#{log_file}", "#{error_log_file}", true
+
+activate_control_app
+
+on_worker_boot do
+  require "active_record"
+  ActiveRecord::Base.connection.disconnect! rescue ActiveRecord::ConnectionNotEstablished
+  ActiveRecord::Base.establish_connection(YAML.load_file("#{app_path}/config/database.yml")[rails_env])
+end
